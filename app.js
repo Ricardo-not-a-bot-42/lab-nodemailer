@@ -15,6 +15,9 @@ const User = require('./models/user');
 
 const app = express();
 
+const basicAuthenticationDeserializer = require('./middleware/basic-authentication-deserializer.js');
+const bindUserToViewLocals = require('./middleware/bind-user-to-view-locals.js');
+
 app.set('views', join(__dirname, 'views'));
 app.set('view engine', 'hbs');
 
@@ -25,9 +28,10 @@ app.use(
   sassMiddleware({
     src: join(__dirname, 'public'),
     dest: join(__dirname, 'public'),
-    outputStyle: process.env.NODE_ENV === 'development' ? 'nested' : 'compressed',
+    outputStyle:
+      process.env.NODE_ENV === 'development' ? 'nested' : 'compressed',
     sourceMap: false,
-    force: true
+    force: true,
   })
 );
 app.use(express.static(join(__dirname, 'public')));
@@ -39,25 +43,28 @@ app.use(
     saveUninitialized: false,
     cookie: {
       maxAge: 60 * 60 * 24 * 15,
-      httpOnly: true
+      httpOnly: true,
     },
     store: new MongoStore({
       mongooseConnection: mongoose.connection,
-      ttl: 60 * 60 * 24
-    })
+      ttl: 60 * 60 * 24,
+    }),
   })
 );
+
+app.use(basicAuthenticationDeserializer);
+app.use(bindUserToViewLocals);
 
 app.use((req, res, next) => {
   const userId = req.session.user;
   if (userId) {
     User.findById(userId)
-      .then(user => {
+      .then((user) => {
         req.user = user;
         res.locals.user = req.user;
         next();
       })
-      .catch(error => {
+      .catch((error) => {
         next(error);
       });
   } else {
